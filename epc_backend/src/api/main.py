@@ -7,6 +7,7 @@ from typing import List, Optional
 from datetime import datetime
 import uuid
 import os
+from enum import Enum
 
 app = FastAPI(
     title="Electronic Police Certificate System API",
@@ -81,7 +82,8 @@ class EPCApplicationRequest(BaseModel):
     country_of_application: str = Field(..., description="Country where certificate will be used")
     address: str = Field(..., description="Applicant's current address")
 
-class EPCApplicationStatus(str):
+class EPCApplicationStatus(str, Enum):
+    """Status for Electronic Police Certificate application."""
     SUBMITTED = "SUBMITTED"
     UNDER_REVIEW = "UNDER_REVIEW"
     APPROVED = "APPROVED"
@@ -95,6 +97,9 @@ class EPCApplicationSummary(BaseModel):
     purpose: str
     status: EPCApplicationStatus
     last_updated: datetime
+
+    class Config:
+        use_enum_values = True
 
 class EPCApplicationDetail(EPCApplicationSummary):
     passport_number: str
