@@ -1,181 +1,214 @@
-# Electronic Police Certificate Backend API: Endpoint Documentation
+# EPC Backend: REST API Endpoints Documentation
 
-This document provides a thorough reference to all REST API endpoints implemented in the FastAPI backend for the Vanuatu Electronic Police Certificate project. Each endpoint summary describes its HTTP method, URL, expected request data, authentication requirements, and response schema. This documentation is useful for frontend developers or system integrators aligning user flows to the backend.
+This document describes all REST API endpoints implemented by the Electronic Police Certificate (EPC) backend (FastAPI), including their purposes, request/response models, and intended user or admin roles.
 
 ---
 
 ## Table of Contents
 
-- [Authentication & User Management](#authentication--user-management)
-- [Applicant Certificate Application](#applicant-certificate-application)
-- [Application Status Tracking](#application-status-tracking)
+- [Authentication and User Management](#authentication-and-user-management)
+- [Certificate Application](#certificate-application)
 - [Certificate Download](#certificate-download)
-- [Administrative Endpoints](#administrative-endpoints)
-- [System Health Check](#system-health-check)
+- [Administrative Operations](#administrative-operations)
+- [Health Check](#health-check)
+- [Summary Table](#summary-table)
 
 ---
 
-## Authentication & User Management
+## Authentication and User Management
 
-### Register new user
-
-- **POST** `/auth/register`
-- **Request:** JSON body (UserRegistration): `{email, password, full_name, phone?}`
-- **Response:** `{access_token, token_type}`
-- **Authentication:** None required.
-- **Purpose:** Registers a new applicant in the system and returns a bearer token upon success.
-
-### Login (issue token)
-
-- **POST** `/auth/login` (form fields: username, password)
-- **Response:** `{access_token, token_type}`
-- **Authentication:** None required.
-- **Purpose:** Authenticate with credentials and obtain authorization token.
-
-### Get current user info
-
-- **GET** `/auth/me`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** User profile (id, email, full_name, is_admin, status)
-- **Authentication:** Required (valid user token).
+### Register a New User
+- **POST /auth/register**
+- **Purpose:** Registers a new applicant user with email, password, name, and phone (optional).
+- **Request Body:**  
+  ```json
+  {
+    "email": "applicant@email.com",
+    "password": "string (min 6 chars)",
+    "full_name": "string",
+    "phone": "string (optional)"
+  }
+  ```
+- **Response:**  
+  ```json
+  { "access_token": "string", "token_type": "bearer" }
+  ```
+- **Notes:** Returns a bearer token on successful registration. Email must be unique.
 
 ---
 
-## Applicant Certificate Application
-
-### Submit new certificate application
-
-- **POST** `/epc/application`
-- **Headers:** `Authorization: Bearer <token>`
-- **Request:** JSON body (`EPCApplicationRequest`): `{purpose, passport_number, country_of_application, address}`
-- **Response:** Application summary (`EPCApplicationSummary`)
-- **Authentication:** Required (user).
-
-### List current user's applications
-
-- **GET** `/epc/application`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** List of application summaries for the user.
-- **Authentication:** Required (user).
-
-### Get application detail
-
-- **GET** `/epc/application/{app_id}`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** Application detail for specified application.
-- **Authentication:** Required (user, must own application).
+### User Login (Token Acquisition)
+- **POST /auth/login**
+- **Purpose:** Authenticates user; returns access token for session.
+- **Request Body:** Form fields (`application/x-www-form-urlencoded`):
+  - username: User email
+  - password: User password
+- **Response:**  
+  ```json
+  { "access_token": "string", "token_type": "bearer" }
+  ```
+- **Notes:** Token is required for all further user actions.
 
 ---
 
-## Application Status Tracking
+### Get Current User Info
+- **GET /auth/me**
+- **Purpose:** Retrieves details on the currently authenticated user.
+- **Auth:** Bearer token required.
+- **Response:**  
+  ```json
+  {
+    "id": "string",
+    "email": "string",
+    "full_name": "string",
+    "is_admin": "bool",
+    "status": "string"
+  }
+  ```
 
-See the endpoints above under [Applicant Certificate Application]. Each submitted application has a status field exposed in the summary/detail return payloads.
+---
+
+## Certificate Application
+
+### Submit a Certificate Application
+- **POST /epc/application**
+- **Purpose:** Submit a new police certificate application.
+- **Auth:** Bearer token required (applicant).
+- **Request Body:**  
+  ```json
+  {
+    "purpose": "string",
+    "passport_number": "string",
+    "country_of_application": "string",
+    "address": "string"
+  }
+  ```
+- **Response:**  
+  Summary of the application created.
+  ```json
+  {
+    "id": "string",
+    "user_id": "string",
+    "date_submitted": "datetime (ISO)",
+    "purpose": "string",
+    "status": "SUBMITTED",
+    "last_updated": "datetime (ISO)"
+  }
+  ```
+
+---
+
+### List User Certificate Applications
+- **GET /epc/application**
+- **Purpose:** List all certificate applications submitted by the authenticated user.
+- **Auth:** Bearer token required (applicant).
+- **Response:**  
+  Array of summaries as shown above.
+
+---
+
+### Get Application Details
+- **GET /epc/application/{app_id}**
+- **Purpose:** Retrieve full detail of a specific application submitted by the user.
+- **Auth:** Bearer token required (applicant).
+- **Response:**  
+  Detailed application info including status, passport, country, address, admin notes.
 
 ---
 
 ## Certificate Download
 
-### Download issued certificate PDF
-
-- **GET** `/epc/certificate/{app_id}/download`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** PDF file download (for issued certificate).
-- **Authentication:** Required (must be applicant of record, certificate must be issued).
-
----
-
-## Administrative Endpoints
-
-> All endpoints in this section require the requester to have admin rights (valid admin token).
-
-### List all applications (Admin Dashboard)
-
-- **GET** `/admin/applications`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** List of all application summaries (all users).
-
-### Get application detail (Admin)
-
-- **GET** `/admin/application/{app_id}`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** Application detail for any user.
-
-### Application decision (Approve/Reject/Review)
-
-- **POST** `/admin/application/{app_id}/decision`
-- **Headers:** `Authorization: Bearer <token>`
-- **Request:** JSON body (`EPCAdminAction`): `{status, admin_notes?}`
-- **Response:** Updated application summary.
-
-### Upload issued certificate PDF
-
-- **POST** `/admin/application/{app_id}/upload-certificate`
-- **Headers:** `Authorization: Bearer <token>`
-- **Request:** `multipart/form-data` (field: `certificate` PDF file)
-- **Response:** `{message: ...}`
+### Download Issued Certificate PDF
+- **GET /epc/certificate/{app_id}/download**
+- **Purpose:** Download the final, signed police certificate (PDF), if issued.
+- **Auth:** Bearer token required (applicant).
+- **Response:** Binary PDF file (application/pdf).
+- **Notes:** Returns 404 or 400 if not issued or not found.
 
 ---
 
-## System Health Check
+## Administrative Operations
 
-- **GET** `/`
-- **Purpose:** Quick health/status check endpoint (no authentication required).
-
----
-
-## Endpoint Overview Diagram
-
-```mermaid
-flowchart TD
-    subgraph Auth
-      A1([POST /auth/register]) -->|Creates| U[(User)]
-      A2([POST /auth/login]) -->|Issues| T[(Token)]
-      A3([GET /auth/me]) -->|Returns| U
-    end
-    subgraph Application
-      B1([POST /epc/application]) -->|Creates| AP[(Application)]
-      B2([GET /epc/application]) -.-> AP
-      B3([GET /epc/application/{app_id}]) -.-> AP
-    end
-    subgraph Certificate
-      C1([GET /epc/certificate/{app_id}/download]) -.-> AP
-    end
-    subgraph Admin
-      D1([GET /admin/applications]) --> AP
-      D2([GET /admin/application/{app_id}]) --> AP
-      D3([POST /admin/application/{app_id}/decision]) --> AP
-      D4([POST /admin/application/{app_id}/upload-certificate]) --> AP
-    end
-    subgraph Health
-      H1([GET /]) 
-    end
-    A1 -.->|Receives token| A2
-    U --> B1
-    U --> B2
-    U --> B3
-    U --> C1
-    U --> D1
-    U --> D2
-    U --> D3
-    U --> D4
-    H1 -. Healthcheck .- H1
-```
+### List All Applications (Admin)
+- **GET /admin/applications**
+- **Purpose:** Lists all applications in the system (admin only).
+- **Auth:** Bearer token (admin).
+- **Response:** Array of all application summaries.
 
 ---
 
-**Endpoint Security Summary:**  
-- Most endpoints require a bearer token. Admin routes require an admin role.
-- Endpoints for registration and login are public.
-- Health check is public.
-- File download and upload operations use binary/multipart responses.
+### Get Application Detail (Admin)
+- **GET /admin/application/{app_id}**
+- **Purpose:** Show details of a given applicant's certificate request.
+- **Auth:** Bearer token (admin).
+- **Response:** Full application detail.
 
 ---
 
-**Note:**  
-- The backend implementation uses in-memory mock data and simple validation for development.  
-- All interactions are to be switched to real persistent data and secure password hashing before production.  
-- Adjust clients to use the correct Authorization header: `Authorization: Bearer <token>`.
+### Approve, Reject, or Update Application Status (Admin)
+- **POST /admin/application/{app_id}/decision**
+- **Purpose:** Approve, reject, or update an application's status. May set admin notes.
+- **Auth:** Bearer token (admin).
+- **Request Body:**  
+  ```json
+  {
+    "status": "UNDER_REVIEW|APPROVED|REJECTED|ISSUED",
+    "admin_notes": "string (optional)"
+  }
+  ```
+- **Response:** Updated summary of the application.
 
 ---
 
-_This document was generated by analyzing the `src/api/main.py` FastAPI application._
+### Upload Issued Certificate (PDF) (Admin)
+- **POST /admin/application/{app_id}/upload-certificate**
+- **Purpose:** Allows admin to upload a signed certificate PDF for a given application (when approved).
+- **Auth:** Bearer token (admin).
+- **Request:** Multipart/form-data field `certificate` (PDF file).
+- **Response:**  
+  ```json
+  { "message": "Certificate uploaded and application marked as ISSUED." }
+  ```
+- **Notes:** Can only upload when application is approved.
+
+---
+
+## Health Check
+
+### API Health Status
+- **GET /**
+- **Purpose:** Quickly check if the backend API is responsive.
+- **Response:**  
+  ```json
+  { "message": "EPC Backend is healthy.", "timestamp": "string (ISO)" }
+  ```
+
+---
+
+## Summary Table
+
+| Endpoint                                               | Method | Purpose                                   | Role        | Integration Required              |
+|--------------------------------------------------------|--------|-------------------------------------------|-------------|-----------------------------------|
+| /auth/register                                         | POST   | User registration                        | Any/applicant | Yes                               |
+| /auth/login                                            | POST   | User authentication (token)              | Any          | Yes                               |
+| /auth/me                                               | GET    | Current user info                        | Any (token)  | Yes                               |
+| /epc/application                                       | POST   | Submit new certificate application       | Applicant    | Yes                               |
+| /epc/application                                       | GET    | List user's applications                 | Applicant    | Yes                               |
+| /epc/application/{app_id}                              | GET    | Application details (user)               | Applicant    | Yes                               |
+| /epc/certificate/{app_id}/download                     | GET    | Download issued certificate (PDF)        | Applicant    | Yes                               |
+| /admin/applications                                    | GET    | List all applications                    | Admin        | Yes (Admin UI)                    |
+| /admin/application/{app_id}                            | GET    | View application in detail               | Admin        | Yes (Admin UI)                    |
+| /admin/application/{app_id}/decision                   | POST   | Approve/reject/set status                | Admin        | Yes (Admin UI)                    |
+| /admin/application/{app_id}/upload-certificate         | POST   | Upload signed certificate PDF            | Admin        | Yes (Admin UI)                    |
+| /                                                     | GET    | Health check                             | Any          | (For monitoring only)             |
+
+---
+
+### Notes
+
+- All authenticated endpoints require a `Bearer` token in the `Authorization` header.
+- Admin endpoints require the authenticated user to be an admin.
+- Application status values: `SUBMITTED`, `UNDER_REVIEW`, `APPROVED`, `REJECTED`, `ISSUED`.
+- Most endpoints return `HTTPException` error codes for unauthorized, forbidden, not found, or invalid requests as per FastAPI conventions.
+
+---
