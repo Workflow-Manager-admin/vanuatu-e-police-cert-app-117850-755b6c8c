@@ -22,6 +22,13 @@ app = FastAPI(
     ]
 )
 
+# The CORS (Cross-Origin Resource Sharing) middleware allows browsers and clients hosted on different domains
+# or ports (such as the EPC React frontend or a mobile app) to access this API. The configuration below
+# allows all origins ('*') to interact with the API, enabling public access from any domain. This 
+# is helpful for development or public-facing APIs where frontend apps may be served from different URLs.
+# In a production environment, you may wish to restrict 'allow_origins' to trusted frontend domains for
+# better security (e.g., ['https://epc.gov.vu', 'https://app.vanuatu-epc.com']). Additional settings allow
+# all standard HTTP methods and headers, and enable passing credentials such as cookies or authorization.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
